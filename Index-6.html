@@ -1,0 +1,1704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Push-Up Tracker</title>
+
+  <!-- Mobile & PWA App Icons -->
+  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230f172a'/><path d='M80 60L87 54L80 48L62 66L20 24L38 6L30 0L24 6L18 0L12 6L0 18L6 24L0 30L6 36L24 18L66 62L48 80L54 87L60 80L66 87L72 80L87 65L80 60Z' fill='%2338bdf8'/></svg>">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230f172a'/><path d='M80 60L87 54L80 48L62 66L20 24L38 6L30 0L24 6L18 0L12 6L0 18L6 24L0 30L6 36L24 18L66 62L48 80L54 87L60 80L66 87L72 80L87 65L80 60Z' fill='%2338bdf8'/></svg>">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#05050a">
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg: #05050a;
+      --card-bg: #0d0d14;
+      --accent: #a855f7;
+      --text: #e2e8f0;
+      --text-muted: #64748b;
+      --border: #1e1e2e;
+      --success: #22c55e;
+      --danger: #ef4444;
+      
+      /* Dynamic Rank CSS variables */
+      --rank-border: var(--border);
+      --rank-badge-color: var(--accent);
+      --rank-glow: rgba(168, 85, 247, 0.35);
+      --rank-aura-color1: #a855f7;
+      --rank-aura-color2: #7c3aed;
+      --rank-bg-gradient: transparent;
+      --rank-lbl-color: var(--accent);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+    html { scroll-behavior: smooth; }
+    body { 
+      background: radial-gradient(ellipse at top, #0f0a1a 0%, #05050a 60%);
+      color: var(--text); 
+      padding: 16px;
+      padding-bottom: max(24px, env(safe-area-inset-bottom));
+      padding-top: max(16px, env(safe-area-inset-top));
+      display: flex; 
+      justify-content: center; 
+      min-height: 100vh;
+      min-height: 100dvh;
+      position: relative;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+    button:focus-visible, input:focus-visible {
+      outline: 2px solid #a855f7;
+      outline-offset: 2px;
+    }
+    h3 { font-size: 1.05rem; font-weight: 700; letter-spacing: 0.02em; color: #e2e8f0; }
+
+    /* Animated purple flame canvas */
+    #flameCanvas {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 45vh;
+      max-height: 460px;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .container { width: 100%; max-width: 700px; display: flex; flex-direction: column; gap: 20px; position: relative; z-index: 1; }
+    .card { 
+      background: linear-gradient(145deg, #0d0d14, #0a0a12); 
+      border: 1px solid var(--border); 
+      border-radius: 14px; 
+      padding: 20px; 
+      transition: all 0.35s ease;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+    }
+    .card:hover {
+      border-color: #2a2a3d;
+    }
+    
+    /* Rank Header Custom Box Styling */
+    .header { 
+      text-align: center; 
+      margin-bottom: 10px; 
+      background: var(--rank-bg-gradient), linear-gradient(145deg, #0d0d14, #0a0a12);
+      border: 2px solid var(--rank-border);
+      box-shadow: 0 0 40px var(--rank-glow), inset 0 0 30px rgba(0,0,0,0.3);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .header-rank-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin-top: 5px;
+    }
+
+    .rank-badge { 
+      font-size: 1.35rem; 
+      font-weight: 900; 
+      color: var(--rank-badge-color); 
+      text-shadow: 0 0 15px var(--rank-glow);
+      letter-spacing: 0.5px;
+      transition: color 0.4s ease;
+    }
+
+    /* Rank Aura Icon Wrapper */
+    .rank-icon-wrapper {
+      position: relative;
+      width: 58px;
+      height: 58px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .rank-icon-wrapper svg {
+      width: 44px;
+      height: 44px;
+      z-index: 2;
+      filter: drop-shadow(0 0 10px var(--rank-badge-color));
+    }
+    .rank-aura-ring {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: radial-gradient(circle, var(--rank-glow) 0%, transparent 70%);
+      animation: iconAuraPulse 2s infinite alternate ease-in-out;
+      z-index: 1;
+    }
+
+    .progress-bar-container { background: #15151f; border-radius: 8px; height: 16px; overflow: hidden; margin: 10px 0; border: 1px solid #1e1e2e; }
+    .progress-bar { background: linear-gradient(90deg, #6b21a8, var(--accent)); height: 100%; width: 0%; transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 0 12px rgba(168, 85, 247, 0.4); }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 15px; text-align: center; }
+    .stat-box { background: rgba(0,0,0,0.35); border-radius: 10px; padding: 12px 10px; border: 1px solid #1e1e2e; transition: border-color 0.3s; }
+    .stat-box:hover { border-color: #3b2d5c; }
+    .stat-val { font-size: 1.4rem; font-weight: bold; color: #e2e8f0; }
+    .stat-lbl { font-size: 0.8rem; color: var(--text-muted); }
+    .controls { display: flex; flex-direction: column; gap: 10px; }
+    .presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    
+    /* Interactive Buttons */
+    button { 
+      background: linear-gradient(145deg, #1a1a28, #12121c); 
+      color: var(--text); 
+      border: 1px solid #2a2a3d; 
+      padding: 11px 14px; 
+      border-radius: 10px; 
+      font-weight: 700; 
+      cursor: pointer; 
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+    }
+    button:hover { 
+      background: linear-gradient(145deg, #252538, #1a1a28); 
+      border-color: #4c1d95;
+      box-shadow: 0 0 18px rgba(168, 85, 247, 0.25);
+      transform: translateY(-1px);
+    }
+    button:active { 
+      transform: scale(0.96) translateY(0); 
+      box-shadow: 0 0 8px rgba(168, 85, 247, 0.15);
+    }
+    button:disabled, .btn-primary:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+      pointer-events: none;
+    }
+    .btn-primary { 
+      background: linear-gradient(135deg, #7c3aed, #a855f7); 
+      color: #fff; 
+      border: none; 
+      box-shadow: 0 4px 15px rgba(168, 85, 247, 0.35);
+    }
+    .btn-primary:hover { 
+      background: linear-gradient(135deg, #6d28d9, #9333ea); 
+      color: white; 
+      box-shadow: 0 6px 22px rgba(168, 85, 247, 0.5);
+      transform: translateY(-2px);
+    }
+    .btn-primary:active { 
+      transform: scale(0.97) translateY(0);
+      box-shadow: 0 2px 10px rgba(168, 85, 247, 0.3);
+    }
+    .btn-danger { 
+      background: rgba(239, 68, 68, 0.12); 
+      color: #f87171; 
+      border: 1px solid rgba(239, 68, 68, 0.4); 
+    }
+    .btn-danger:hover { 
+      background: #ef4444; 
+      color: white; 
+      border-color: #ef4444;
+      box-shadow: 0 0 18px rgba(239, 68, 68, 0.35);
+    }
+    .btn-danger:active { transform: scale(0.96); }
+    
+    .input-group { display: flex; gap: 10px; }
+    input[type="number"], input[type="time"] { 
+      background: rgba(0,0,0,0.4); 
+      border: 1px solid #1e1e2e; 
+      color: var(--text); 
+      padding: 11px; 
+      border-radius: 10px; 
+      width: 100%; 
+      text-align: center; 
+      font-size: 1rem; 
+      color-scheme: dark;
+      transition: border-color 0.25s, box-shadow 0.25s;
+    }
+    input[type="number"]:focus, input[type="time"]:focus {
+      outline: none;
+      border-color: #7c3aed;
+      box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.15);
+    }
+    .history-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .set-chip { background: rgba(168, 85, 247, 0.12); border: 1px solid #7c3aed; color: #c084fc; padding: 4px 10px; border-radius: 16px; font-size: 0.85rem; }
+    .set-chip.negative { background: rgba(239, 68, 68, 0.12); border-color: var(--danger); color: #f87171; }
+
+    /* Reminder Styles */
+    .reminder-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: rgba(0,0,0,0.35); border: 1px solid #1e1e2e; border-radius: 10px; margin-top: 8px; transition: border-color 0.25s; }
+    .reminder-item:hover { border-color: #3b2d5c; }
+    .reminder-controls { display: flex; gap: 10px; align-items: center; }
+    .switch { position: relative; display: inline-block; width: 42px; height: 24px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #1e1e2e; transition: .35s; border-radius: 24px; }
+    .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: #94a3b8; transition: .35s; border-radius: 50%; }
+    input:checked + .slider { background-color: #7c3aed; box-shadow: 0 0 10px rgba(168, 85, 247, 0.4); }
+    input:checked + .slider:before { transform: translateX(18px); background-color: #fff; }
+
+    /* Modal Styles */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(4px);
+      display: flex; justify-content: center; align-items: center;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.2s ease;
+      z-index: 1000;
+    }
+    .modal-overlay.active { opacity: 1; pointer-events: auto; }
+    .modal {
+      background: linear-gradient(160deg, #0d0d16, #0a0a12);
+      border: 1px solid #2a2a3d;
+      border-radius: 16px;
+      padding: 28px;
+      max-width: 400px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 25px 50px rgba(0,0,0,0.7), 0 0 30px rgba(168, 85, 247, 0.08);
+    }
+    .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+    .modal-actions button { flex: 1; }
+
+    /* RANK UPGRADE OVERLAY – Clean Shadow Style (no aura rings) */
+    #rank-upgrade-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(5, 5, 10, 0.94);
+      backdrop-filter: blur(14px);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 10000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.4s ease;
+      overflow: hidden;
+    }
+    #rank-upgrade-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .rank-up-card {
+      text-align: center;
+      padding: 42px 32px;
+      border-radius: 20px;
+      background: linear-gradient(160deg, #0d0d16, #0a0a12);
+      border: 2px solid var(--rank-border);
+      box-shadow: 0 0 50px var(--rank-glow), 0 20px 40px rgba(0,0,0,0.6);
+      animation: rankPopIn 0.55s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      max-width: 400px;
+      width: 88%;
+      position: relative;
+      z-index: 10;
+    }
+    .rank-up-subtitle {
+      font-size: 0.8rem;
+      letter-spacing: 5px;
+      color: #64748b;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    .rank-up-icon-box {
+      position: relative;
+      width: 120px;
+      height: 120px;
+      margin: 14px auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .rank-up-icon-box svg {
+      width: 100px;
+      height: 100px;
+      filter: drop-shadow(0 0 20px var(--rank-badge-color));
+      z-index: 2;
+    }
+    .rank-up-name {
+      font-size: 2rem;
+      font-weight: 900;
+      margin: 14px 0 8px 0;
+      color: var(--rank-badge-color);
+      text-shadow: 0 0 20px var(--rank-glow);
+    }
+
+    @keyframes iconAuraPulse {
+      0% { transform: scale(0.9); opacity: 0.5; }
+      100% { transform: scale(1.3); opacity: 1; }
+    }
+    @keyframes rankPopIn {
+      0% { transform: scale(0.3) translateY(60px); opacity: 0; }
+      100% { transform: scale(1) translateY(0); opacity: 1; }
+    }
+
+    /* Crazy Aura Opening Screen */
+    #aura-splash {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: radial-gradient(ellipse at center, #12081f 0%, #05050a 70%);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      overflow: hidden;
+      cursor: pointer;
+      transition: opacity 0.8s ease, visibility 0.8s ease;
+    }
+    #aura-splash.fade-out {
+      opacity: 0;
+      visibility: hidden;
+    }
+    .aura-container {
+      position: relative;
+      width: 200px;
+      height: 200px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .aura-ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      animation: pulse-spin 2s infinite ease-in-out;
+    }
+    .aura-ring-1 {
+      width: 100%;
+      height: 100%;
+      box-shadow: 0 0 50px #a855f7, inset 0 0 30px #7c3aed;
+      animation-duration: 2.5s;
+    }
+    .aura-ring-2 {
+      width: 130%;
+      height: 130%;
+      box-shadow: 0 0 70px #6b21a8, inset 0 0 40px #4c1d95;
+      animation: reverse-spin 1.8s infinite linear;
+      opacity: 0.75;
+      border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
+    }
+    .aura-ring-3 {
+      width: 160%;
+      height: 160%;
+      box-shadow: 0 0 100px #3b0764;
+      animation: pulse-spin 3s infinite ease-in-out;
+      opacity: 0.5;
+      border-radius: 60% 40% 30% 70% / 50% 30% 70% 50%;
+    }
+    .aura-core {
+      position: relative;
+      z-index: 10;
+      font-size: 3rem;
+      animation: core-power 1.2s infinite alternate ease-in-out;
+      filter: drop-shadow(0 0 18px #a855f7);
+    }
+    .aura-title {
+      margin-top: 50px;
+      font-size: 1.8rem;
+      font-weight: 900;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      background: linear-gradient(90deg, #a855f7, #c084fc, #7c3aed, #a855f7);
+      background-size: 200% auto;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: shine 2.5s linear infinite, glow 1.5s infinite alternate;
+      z-index: 10;
+    }
+    .aura-subtitle {
+      font-size: 0.85rem;
+      color: #64748b;
+      margin-top: 8px;
+      letter-spacing: 3px;
+      z-index: 10;
+      text-transform: uppercase;
+    }
+    @keyframes pulse-spin {
+      0% { transform: rotate(0deg) scale(0.95); }
+      50% { transform: rotate(180deg) scale(1.1); }
+      100% { transform: rotate(360deg) scale(0.95); }
+    }
+    @keyframes reverse-spin {
+      0% { transform: rotate(360deg) scale(1.05); }
+      50% { transform: rotate(180deg) scale(0.9); }
+      100% { transform: rotate(0deg) scale(1.05); }
+    }
+    @keyframes core-power {
+      0% { transform: scale(0.9); filter: drop-shadow(0 0 12px #7c3aed); }
+      100% { transform: scale(1.25); filter: drop-shadow(0 0 40px #c084fc); }
+    }
+    @keyframes shine {
+      to { background-position: 200% center; }
+    }
+    @keyframes glow {
+      0% { filter: drop-shadow(0 0 6px rgba(168, 85, 247, 0.4)); }
+      100% { filter: drop-shadow(0 0 22px rgba(192, 132, 252, 0.85)); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Animated purple flame aura -->
+<canvas id="flameCanvas" aria-hidden="true"></canvas>
+
+<!-- Crazy Aura Splash Screen -->
+<div id="aura-splash" onclick="dismissSplash()">
+  <div class="aura-container">
+    <div class="aura-ring aura-ring-3"></div>
+    <div class="aura-ring aura-ring-2"></div>
+    <div class="aura-ring aura-ring-1"></div>
+    <div class="aura-core">⚡</div>
+  </div>
+  <div class="aura-title">Push-Up Tracker</div>
+  <div class="aura-subtitle">Unleash Your Power</div>
+</div>
+
+<!-- Rank Upgrade Overlay (clean, no aura rings) -->
+<div id="rank-upgrade-overlay" onclick="closeRankUpgrade()">
+  <div class="rank-up-card" id="rankUpCard">
+    <div class="rank-up-subtitle">New Rank Unlocked</div>
+    <div class="rank-up-icon-box" id="rankUpIconBox"></div>
+    <div class="rank-up-name" id="rankUpTitle">Bronze Recruiter</div>
+    <button class="btn-primary" style="margin-top: 28px; width: 100%; padding: 15px; font-size: 1.05rem; letter-spacing: 1.5px;" onclick="event.stopPropagation(); closeRankUpgrade()">CLAIM RANK</button>
+  </div>
+</div>
+
+<div class="container">
+  <!-- Rank & Level Header -->
+  <div class="card header" id="rankHeaderBox">
+    <div style="font-size: 0.9rem; color: var(--text-muted);">CURRENT LEVEL & RANK</div>
+    
+    <div class="header-rank-container">
+      <div class="rank-icon-wrapper">
+        <div class="rank-aura-ring"></div>
+        <div id="headerRankIcon"></div>
+      </div>
+      <div id="rankTitle" class="rank-badge">Lvl 1 • Bronze Recruiter</div>
+    </div>
+    
+    <!-- Level Progression (100 Reps Per Level) -->
+    <div id="dailyLevelLbl" style="margin-top: 14px; font-size: 0.85rem; font-weight: bold; text-align: left; color: var(--rank-lbl-color);">Level Progress (100 Push-Ups per Level)</div>
+    <div class="progress-bar-container">
+      <div id="levelBar" class="progress-bar"></div>
+    </div>
+    <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-muted);">
+      <span id="currentLevelDays">0 / 100 Reps</span>
+      <span id="nextLevel">Level 2 in 100 Reps</span>
+    </div>
+
+    <!-- Continuous Rank Progression -->
+    <div id="rankProgressLbl" style="margin-top: 12px; font-size: 0.85rem; font-weight: bold; text-align: left; color: var(--rank-lbl-color);">Rank Progress (3,000 Reps per Rank)</div>
+    <div class="progress-bar-container">
+      <div id="rankBar" class="progress-bar"></div>
+    </div>
+    <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-muted);">
+      <span id="currentRankMonths">0 / 3,000 Reps</span>
+      <span id="nextRankTitle">Next Rank: Apprentice</span>
+    </div>
+  </div>
+
+  <!-- Dashboard Stats -->
+  <div class="card">
+    <h3 style="margin-bottom: 12px;">Progress Overview</h3>
+    
+    <!-- Today's Goal -->
+    <div style="margin-bottom: 14px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 6px;">
+        <span style="font-size: 0.85rem; font-weight: 600; color: #c084fc;">Today's Goal</span>
+        <span id="todayGoalText" style="font-size: 0.8rem; color: var(--text-muted);">0 / 100</span>
+      </div>
+      <div class="progress-bar-container" style="height: 12px;">
+        <div id="todayBar" class="progress-bar" style="background: linear-gradient(90deg, #7c3aed, #c084fc);"></div>
+      </div>
+    </div>
+
+    <!-- Monthly Goal -->
+    <div style="margin-bottom: 14px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 6px;">
+        <span style="font-size: 0.85rem; font-weight: 600; color: #86efac;">This Month</span>
+        <span id="monthGoalText" style="font-size: 0.8rem; color: var(--text-muted);">0 / 3,000</span>
+      </div>
+      <div class="progress-bar-container" style="height: 12px;">
+        <div id="monthlyBar" class="progress-bar" style="background: linear-gradient(90deg, #16a34a, #4ade80);"></div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="stat-box">
+        <div id="monthCount" class="stat-val">0</div>
+        <div class="stat-lbl">Month Reps</div>
+      </div>
+      <div class="stat-box">
+        <div id="activeDaysCount" class="stat-val">Lvl 1</div>
+        <div class="stat-lbl">Level</div>
+      </div>
+      <div class="stat-box">
+        <div id="totalLifetime" class="stat-val">0</div>
+        <div class="stat-lbl">Lifetime</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rep Entry Controls -->
+  <div class="card controls" id="logControlsCard">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
+      <label style="font-weight: 700; font-size: 0.95rem;" id="logLabel">Log Set</label>
+      <span id="todayRepsBadge" style="font-size: 0.8rem; font-weight: 600; color: #c084fc; background: rgba(168,85,247,0.12); padding: 4px 10px; border-radius: 20px;">0 today</span>
+    </div>
+    <div class="presets" id="presetButtons">
+      <button type="button" onclick="addReps(10)">+10</button>
+      <button type="button" onclick="addReps(15)">+15</button>
+      <button type="button" onclick="addReps(20)">+20</button>
+      <button type="button" onclick="addReps(25)">+25</button>
+    </div>
+    <div class="input-group" id="customLogGroup">
+      <input type="number" id="customInput" inputmode="numeric" placeholder="Custom (e.g. 30)" aria-label="Custom reps">
+      <button type="button" class="btn-primary" id="logSetBtn" onclick="addCustom()">Log</button>
+    </div>
+    <div id="dailyGoalLocked" style="display:none; text-align:center; padding: 20px 14px; border-radius: 14px; background: linear-gradient(145deg, rgba(168, 85, 247, 0.12), rgba(124, 58, 237, 0.06)); border: 1px solid rgba(168, 85, 247, 0.3); margin-top: 6px;">
+      <div style="font-size: 1.15rem; font-weight: 800; color: #e9d5ff; letter-spacing: 0.5px;">Daily Goal Complete</div>
+      <div style="font-size: 0.85rem; color: #a78bfa; margin-top: 6px;">100 push-ups done. Come back tomorrow.</div>
+    </div>
+    <div style="margin-top: 12px;">
+      <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500;">Today's sets</span>
+      <div id="setHistory" class="history-list"></div>
+      <div id="emptySets" style="display:none; font-size: 0.85rem; color: var(--text-muted); margin-top: 8px; text-align: center;">No sets logged yet today</div>
+    </div>
+  </div>
+
+  <!-- Yearly/Monthly Performance Chart -->
+  <div class="card">
+    <h3 style="margin-bottom: 15px;">Monthly Progress</h3>
+    <canvas id="monthlyChart" height="200"></canvas>
+  </div>
+
+  <!-- Workout Reminders Section -->
+  <div class="card">
+    <h3 style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+      <span>⏰ Workout Reminders</span>
+      <button onclick="requestNotificationPermission()" id="notifPermBtn" style="font-size: 0.75rem; padding: 4px 8px;">Enable System Alerts</button>
+    </h3>
+    <div class="input-group">
+      <input type="time" id="reminderTimeInput">
+      <button class="btn-primary" onclick="addReminder()">Add Reminder</button>
+    </div>
+    <div id="reminderList" style="margin-top: 10px;"></div>
+  </div>
+
+  <!-- Reset Option -->
+  <div style="text-align: center; margin-top: 8px; margin-bottom: 8px;">
+    <button type="button" class="btn-danger" onclick="showResetModal()" style="font-size: 0.85rem; padding: 10px 18px;">Reset All Progress</button>
+  </div>
+
+  <div style="text-align: center; padding: 12px 0 28px; color: #475569; font-size: 0.75rem; letter-spacing: 0.04em;">
+    Shadow Monarch Tracker · Local data only
+  </div>
+</div>
+
+<!-- Confirmation Modal -->
+<div id="resetModal" class="modal-overlay">
+  <div class="modal">
+    <h3 style="margin-bottom: 10px; color: var(--danger);">Reset All Progress?</h3>
+    <p style="font-size: 0.9rem; color: var(--text-muted);">Are you sure you want to clear all logged push-ups, levels, ranks, and history? This action cannot be undone.</p>
+    <div class="modal-actions">
+      <button onclick="hideResetModal()">Cancel</button>
+      <button class="btn-danger" onclick="confirmReset()">Yes, Reset</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let splashTimer = null;
+
+  function dismissSplash() {
+    const splash = document.getElementById('aura-splash');
+    if (splash && !splash.classList.contains('fade-out')) {
+      splash.classList.add('fade-out');
+      if (splashTimer) clearTimeout(splashTimer);
+    }
+  }
+
+  let audioCtx = null;
+
+  function initAudio() {
+    if (!audioCtx) {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (AudioContext) audioCtx = new AudioContext();
+    }
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+  }
+
+  function playSetLogSound() {
+    initAudio();
+    if (!audioCtx) return;
+    const now = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(523.25, now);
+    osc.frequency.exponentialRampToValueAtTime(659.25, now + 0.1);
+    gain.gain.setValueAtTime(0.3, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(now);
+    osc.stop(now + 0.2);
+  }
+
+  function playLevelUpSound() {
+    initAudio();
+    if (!audioCtx) return;
+    const notes = [523.25, 659.25, 783.99, 1046.50];
+    const now = audioCtx.currentTime;
+    notes.forEach((freq, idx) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.value = freq;
+      const startTime = now + (idx * 0.08);
+      gain.gain.setValueAtTime(0.3, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.25);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(startTime);
+      osc.stop(startTime + 0.25);
+    });
+  }
+
+  /* HIGH-INTENSITY ARCHITECTURAL AUDIO SYNTHESIZER ENGINES FOR EACH RANK */
+  function playRankSound(type) {
+    initAudio();
+    if (!audioCtx) return;
+    const now = audioCtx.currentTime;
+
+    // Helper: create noise buffer
+    function createNoise(duration) {
+      const size = Math.floor(audioCtx.sampleRate * duration);
+      const buffer = audioCtx.createBuffer(1, size, audioCtx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < size; i++) data[i] = Math.random() * 2 - 1;
+      return buffer;
+    }
+
+    // Helper: play filtered noise burst
+    function noiseBurst(start, duration, filterFreq, gainVal, filterType = 'bandpass') {
+      const noise = audioCtx.createBufferSource();
+      noise.buffer = createNoise(duration);
+      const filter = audioCtx.createBiquadFilter();
+      filter.type = filterType;
+      filter.frequency.value = filterFreq;
+      filter.Q.value = 2.2;
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(gainVal, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + duration);
+      noise.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+      noise.start(start); noise.stop(start + duration);
+    }
+
+    // Helper: aggressive oscillator with sharp attack
+    function tone(freq, type, start, duration, peakGain, endFreq = null) {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, start);
+      if (endFreq) osc.frequency.exponentialRampToValueAtTime(Math.max(endFreq, 15), start + duration);
+      gain.gain.setValueAtTime(0.001, start);
+      gain.gain.linearRampToValueAtTime(peakGain, start + 0.012); // sharper attack
+      gain.gain.exponentialRampToValueAtTime(0.001, start + duration);
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.start(start); osc.stop(start + duration + 0.08);
+    }
+
+    switch (type) {
+      case 'bronze': { // EARTH-SHAKING War Drum + Brass Apocalypse
+        tone(70, 'sine', now, 1.2, 1.15, 18);
+        tone(45, 'triangle', now, 1.0, 0.9, 15);
+        tone(95, 'sawtooth', now, 0.7, 0.55, 30);
+        noiseBurst(now, 0.22, 140, 0.95, 'lowpass');
+        noiseBurst(now, 0.18, 3200, 0.55, 'bandpass');
+        const brass = [146.83, 185, 220, 277, 330, 440, 554];
+        brass.forEach((f, i) => {
+          tone(f, 'sawtooth', now + 0.06 + i * 0.05, 0.85, 0.38);
+          tone(f * 2.01, 'square', now + 0.06 + i * 0.05, 0.5, 0.18);
+        });
+        noiseBurst(now + 0.04, 0.35, 4800, 0.5, 'highpass');
+        break;
+      }
+      case 'apprentice': { // VIOLENT Arcane Crystal Detonation + Harmonic Storm
+        noiseBurst(now, 0.25, 6200, 0.75, 'highpass');
+        noiseBurst(now + 0.04, 0.4, 3100, 0.6, 'bandpass');
+        noiseBurst(now, 0.3, 900, 0.5, 'lowpass');
+        const notes = [523.25, 659.25, 783.99, 987.77, 1174.66, 1396.91, 1661.22, 2093, 2637, 3136];
+        notes.forEach((f, i) => {
+          tone(f, 'sine', now + i * 0.028, 0.7, 0.42);
+          tone(f * 1.498, 'triangle', now + i * 0.028, 0.5, 0.22);
+        });
+        tone(1046.5, 'triangle', now, 1.4, 0.35, 4186);
+        tone(1568, 'sine', now + 0.08, 1.2, 0.28, 5274);
+        tone(70, 'sine', now, 0.7, 0.7, 22);
+        break;
+      }
+      case 'iron': { // DEVASTATING Hydraulic Anvil + Reactor Meltdown
+        tone(48, 'sine', now, 1.3, 1.2, 12);
+        tone(85, 'square', now, 0.9, 0.75, 20);
+        tone(130, 'sawtooth', now, 0.7, 0.5, 35);
+        noiseBurst(now, 0.3, 700, 1.0, 'lowpass');
+        noiseBurst(now, 0.22, 2800, 0.75, 'bandpass');
+        noiseBurst(now + 0.04, 0.45, 7200, 0.6, 'highpass');
+        tone(370, 'sawtooth', now + 0.02, 0.8, 0.4, 140);
+        tone(740, 'triangle', now + 0.05, 0.65, 0.28, 180);
+        tone(35, 'sawtooth', now + 0.08, 1.0, 0.5, 18);
+        break;
+      }
+      case 'steel': { // DUAL HYPER-VOLTAGE Plasma Blade Execution
+        tone(55, 'sine', now, 0.8, 0.9, 18);
+        // Blade 1
+        tone(2400, 'sawtooth', now, 0.55, 0.7, 90);
+        tone(3600, 'square', now, 0.4, 0.4, 140);
+        noiseBurst(now, 0.25, 5200, 0.7, 'highpass');
+        // Blade 2
+        tone(3100, 'sawtooth', now + 0.11, 0.5, 0.65, 70);
+        tone(4500, 'square', now + 0.11, 0.35, 0.35, 110);
+        noiseBurst(now + 0.11, 0.22, 6200, 0.6, 'highpass');
+        // Aftershock crackle
+        noiseBurst(now + 0.22, 0.4, 7800, 0.45, 'bandpass');
+        tone(90, 'sawtooth', now + 0.15, 0.6, 0.4, 30);
+        break;
+      }
+      case 'vanguard': { // CINEMATIC Heroic Brass Apocalypse + Power Overload
+        tone(42, 'sine', now, 1.6, 1.1, 14);
+        tone(68, 'triangle', now, 1.4, 0.7, 20);
+        const brassChord = [110, 146.83, 174.61, 220, 261.63, 329.63, 392, 523.25, 659.25];
+        brassChord.forEach((f) => {
+          tone(f, 'sawtooth', now + 0.04, 1.4, 0.32);
+          tone(f * 2.005, 'square', now + 0.04, 1.0, 0.14);
+        });
+        [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((f, i) => {
+          tone(f, 'triangle', now + 0.12 + i * 0.09, 1.0, 0.38);
+        });
+        noiseBurst(now, 0.2, 160, 0.85, 'lowpass');
+        noiseBurst(now + 0.3, 0.35, 2800, 0.4, 'bandpass');
+        break;
+      }
+      case 'titan': { // APOCALYPTIC Seismic Cataclysm + Core Collapse
+        tone(28, 'sine', now, 2.0, 1.3, 8);
+        tone(48, 'sawtooth', now, 1.7, 0.9, 12);
+        tone(85, 'square', now, 1.3, 0.6, 18);
+        noiseBurst(now, 0.5, 120, 1.1, 'lowpass');
+        noiseBurst(now + 0.08, 0.6, 380, 0.8, 'bandpass');
+        noiseBurst(now + 0.18, 0.7, 1400, 0.55, 'highpass');
+        tone(38, 'sine', now + 0.4, 1.3, 0.85, 10);
+        noiseBurst(now + 0.45, 0.4, 90, 0.7, 'lowpass');
+        break;
+      }
+      case 'shadow': { // CYBER-DEATH Plasma Whip + Phase Annihilation
+        tone(38, 'sine', now, 1.1, 0.9, 55);
+        const whip = audioCtx.createOscillator();
+        const whipGain = audioCtx.createGain();
+        whip.type = 'sawtooth';
+        whip.frequency.setValueAtTime(60, now);
+        whip.frequency.exponentialRampToValueAtTime(5800, now + 0.25);
+        whip.frequency.exponentialRampToValueAtTime(40, now + 0.95);
+        whipGain.gain.setValueAtTime(0.001, now);
+        whipGain.gain.linearRampToValueAtTime(0.85, now + 0.04);
+        whipGain.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
+        whip.connect(whipGain); whipGain.connect(audioCtx.destination);
+        whip.start(now); whip.stop(now + 1.05);
+        // Second phase layer
+        const whip2 = audioCtx.createOscillator();
+        const whip2Gain = audioCtx.createGain();
+        whip2.type = 'square';
+        whip2.frequency.setValueAtTime(90, now + 0.05);
+        whip2.frequency.exponentialRampToValueAtTime(4200, now + 0.3);
+        whip2.frequency.exponentialRampToValueAtTime(50, now + 0.9);
+        whip2Gain.gain.setValueAtTime(0.001, now + 0.05);
+        whip2Gain.gain.linearRampToValueAtTime(0.45, now + 0.1);
+        whip2Gain.gain.exponentialRampToValueAtTime(0.001, now + 0.95);
+        whip2.connect(whip2Gain); whip2Gain.connect(audioCtx.destination);
+        whip2.start(now + 0.05); whip2.stop(now + 1.0);
+        noiseBurst(now + 0.12, 0.3, 6800, 0.65, 'highpass');
+        noiseBurst(now + 0.28, 0.4, 3200, 0.45, 'bandpass');
+        tone(28, 'sine', now + 0.35, 0.9, 0.7, 12);
+        break;
+      }
+      case 'warlord': { // BLOOD-FURY War Horn Legion + Thunder Cataclysm
+        const horns = [41, 55, 82.41, 110, 146.83, 164.81, 220, 277.18, 330];
+        horns.forEach((f) => {
+          tone(f, 'square', now, 1.3, 0.35);
+          tone(f * 1.008, 'sawtooth', now + 0.015, 1.2, 0.25);
+        });
+        horns.forEach((f) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(f, now + 0.08);
+          osc.frequency.linearRampToValueAtTime(f * 1.22, now + 1.15);
+          gain.gain.setValueAtTime(0.001, now + 0.08);
+          gain.gain.linearRampToValueAtTime(0.28, now + 0.2);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 1.25);
+          osc.connect(gain); gain.connect(audioCtx.destination);
+          osc.start(now + 0.08); osc.stop(now + 1.3);
+        });
+        noiseBurst(now, 0.4, 180, 0.95, 'lowpass');
+        noiseBurst(now + 0.05, 0.35, 1600, 0.55, 'bandpass');
+        noiseBurst(now + 0.15, 0.4, 4500, 0.4, 'highpass');
+        break;
+      }
+      case 'overlord': { // VOID COLLAPSE + Dark Matter Singularity
+        tone(22, 'sine', now, 1.8, 1.2, 7);
+        tone(36, 'sawtooth', now, 1.6, 0.8, 11);
+        tone(55, 'square', now, 1.3, 0.5, 16);
+        const cascade = [50, 75, 110, 165, 250, 380, 570, 860, 1300];
+        cascade.forEach((f, i) => {
+          tone(f, 'sawtooth', now + i * 0.05, 1.1, 0.35, f * 3.8);
+          tone(f * 1.5, 'square', now + i * 0.05, 0.8, 0.2, f * 2.8);
+        });
+        noiseBurst(now, 0.6, 90, 0.9, 'lowpass');
+        noiseBurst(now + 0.15, 0.7, 600, 0.6, 'bandpass');
+        noiseBurst(now + 0.35, 0.6, 4000, 0.45, 'highpass');
+        tone(40, 'sine', now + 0.5, 1.1, 0.9, 9);
+        break;
+      }
+      case 'grandmaster': { // ★ COMPLETELY NEW: DIVINE SUPERNOVA / GOLDEN GOD ASCENSION ★
+        // Phase 1 – Silence broken by a rising golden pulse
+        tone(55, 'sine', now, 0.6, 0.4, 110);
+        tone(110, 'triangle', now + 0.1, 0.5, 0.35, 220);
+
+        // Phase 2 – Sudden massive sub detonation (the “god punch”)
+        tone(25, 'sine', now + 0.35, 1.8, 1.4, 6);
+        tone(40, 'sawtooth', now + 0.35, 1.5, 0.9, 10);
+        noiseBurst(now + 0.35, 0.45, 80, 1.2, 'lowpass');
+
+        // Phase 3 – Golden harmonic supernova explosion (completely different from previous fanfare)
+        const golden = [196, 247, 294, 370, 440, 554, 659, 784, 988, 1175, 1480, 1760, 2093, 2637, 3136];
+        golden.forEach((f, i) => {
+          const t = now + 0.4 + i * 0.04;
+          tone(f, 'sine', t, 1.4, 0.38);
+          tone(f * 2.01, 'triangle', t, 1.1, 0.22);
+          tone(f * 0.5, 'sawtooth', t, 0.9, 0.15);
+        });
+
+        // Phase 4 – Shimmering divine overtones + residual cosmic noise
+        noiseBurst(now + 0.45, 0.7, 5500, 0.55, 'highpass');
+        noiseBurst(now + 0.6, 0.8, 2200, 0.4, 'bandpass');
+        tone(80, 'sine', now + 0.7, 1.4, 0.7, 15);
+        tone(160, 'triangle', now + 0.75, 1.2, 0.4, 30);
+
+        // Final afterglow – soft golden choir that fades into infinity
+        [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
+          tone(f, 'sine', now + 0.9 + i * 0.08, 1.6, 0.25);
+        });
+        break;
+      }
+    }
+  }
+
+  const RANKS = [
+    "Bronze Recruiter",
+    "Apprentice",
+    "Iron Core",
+    "Steel Breaker",
+    "Vanguard",
+    "Titan Juggernaut",
+    "Shadow Striker",
+    "Warlord",
+    "Overlord",
+    "Grandmaster"
+  ];
+
+  /* HIGH-INTENSITY INTRICATE METALLIC VECTOR EMBLEMS (SVG) FOR EVERY RANK */
+  const SVG_ICONS = [
+    // 0: Bronze Recruiter (Ornate Bronze Shield & Crossed Broadswords)
+    `<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="bronzeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#fbbf24"/>
+          <stop offset="50%" stop-color="#d97706"/>
+          <stop offset="100%" stop-color="#78350f"/>
+        </linearGradient>
+      </defs>
+      <path d="M20 20 L80 20 L80 50 C80 75 50 90 50 90 C50 90 20 75 20 50 Z" fill="url(#bronzeGrad)" stroke="#f59e0b" stroke-width="3"/>
+      <path d="M28 28 L72 28 L72 48 C72 68 50 80 50 80 C50 80 28 68 28 48 Z" fill="#1e293b" stroke="#fbbf24" stroke-width="2"/>
+      <path d="M30 30 L70 70 M70 30 L30 70" stroke="#f59e0b" stroke-width="4" stroke-linecap="round"/>
+      <circle cx="50" cy="50" r="12" fill="url(#bronzeGrad)" stroke="#fff" stroke-width="2"/>
+    </svg>`,
+
+    // 1: Apprentice (Arcane Magic Crystal Tome)
+    `<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="appG" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#6ee7b7"/>
+          <stop offset="100%" stop-color="#047857"/>
+        </linearGradient>
+      </defs>
+      <polygon points="50,10 85,30 85,70 50,90 15,70 15,30" fill="#064e3b" stroke="#34d399" stroke-width="3"/>
+      <polygon points="50,22 73,36 73,64 50,78 27,64 27,36" fill="url(#appG)"/>
+      <polygon points="50,10 50,90 M15,30 L85,70 M15,70 L85,30" stroke="#a7f3d0" stroke-width="2"/>
+      <circle cx="50" cy="50" r="14" fill="#064e3b" stroke="#6ee7b7" stroke-width="3"/>
+    </svg>`,
+
+    // 2: Iron Core (Heavy Reinforced Mech Reactor Plate)
+    `<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="15" y="15" width="70" height="70" rx="16" fill="#334155" stroke="#94a3b8" stroke-width="4"/>
+      <rect x="26" y="26" width="48" height="48" rx="8" fill="#0f172a" stroke="#cbd5e1" stroke-width="2"/>
+      <circle cx="50" cy="50" r="16" fill="#64748b" stroke="#f1f5f9" stroke-width="4"/>
+      <path d="M50 10 L50 26 M50 74 L50 90 M10 50 L26 50 M74 50 L90 50" stroke="#cbd5e1" stroke-width="5" stroke-linecap="round"/>
+      <circle cx="50" cy="50" r="6" fill="#e2e8f0"/>
+    </svg>`,
+
+    // 3: Steel Breaker (Dual Steel Battle Axes with Cyan Plasma Core)
+    `<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M50 10 L62 38 L90 50 L62 62 L50 90 L38 62 L10 50 L38 38 Z" fill="#0891b2" stroke="#22d3ee" stroke-width="3"/>
+      <path d="M50 24 L58 42 L76 50 L58 58 L50 76 L42 58 L24 50 L42 42 Z" fill="#155e75" stroke="#67e8f9" stroke-width="2"/>
+      <circle cx="50" cy="50" r="10" fill="#22d3ee" stroke="#fff" stroke-width="2"/>
+    </svg>`,
+
+    // 4: Vanguard (V-Shield Heroic Crest)
+    `<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M50 10 L88 25 L75 85 L50 98 L25 85 L12 25 Z" fill="#4c1d95" stroke="#a78bfa" stroke-width="4"/>
+      <path d="M50 22 L76 34 L66 75 L50 85 L34 75 L24 34 Z" fill="#6d28d9" stroke="#c4b5fd" stroke-width="2"/>
+      <path d="M30 35 L50 70 L70 35" stroke="#ddd6fe" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>`,
+
+    // 5: Titan Juggernaut (Heavy Fire-Spit Fortress Crown)
+    `<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M15 80 L25 25 L50 40 L75 25 L85 80 Z" fill="#7c2d12" stroke="#fb923c" stroke-width="4"/>
+      <polygon points="50,10 65,38 92,38 70,56 78,85 50,68 22,85 30,56 8,38 35,38" fill="#ea580c" stroke="#ffedd5" stroke-width="2"/>
+      <circle cx="50" cy="52" r="10" fill="#f97316" stroke="#fff" stroke-width="3"/>
+    </svg>`,
+
+    // 6: Shadow Striker (Neon Magenta Ninja Shuriken)
+    `<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M50 10 C50 35 35 50 10 50 C35 50 50 65 50 90 C50 65 65 50 90 50 C65 50 50 35 50 10 Z" fill="#831843" stroke="#f472b6" stroke-width="4"/>
+      <path d="M50 25 C50 40 40 50 25 50 C40 50 50 60 50 75 C50 60 60 50 75 50 C60 50 50 40 50 25 Z" fill="#be185d" stroke="#fbcfe8" stroke-width="2"/>
+      <circle cx="50" cy="50" r="8" fill="#f472b6" stroke="#fff" stroke-width="2"/>
+    </svg>`,
+
+    // 7: Warlord (Crimson Skull Warrior Helmet)
+    `<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M50 10 L85 30 L75 80 L50 95 L25 80 L15 30 Z" fill="#7f1d1d" stroke="#ef4444" stroke-width="4"/>
+      <path d="M30 20 L50 5 L70 20 L80 45 L50 40 L20 45 Z" fill="#b91c1c" stroke="#fca5a5" stroke-width="2"/>
+      <circle cx="38" cy="55" r="7" fill="#000" stroke="#ef4444" stroke-width="2"/>
+      <circle cx="62" cy="55" r="7" fill="#000" stroke="#ef4444" stroke-width="2"/>
+      <path d="M40 75 L50 68 L60 75" stroke="#f87171" stroke-width="4" stroke-linecap="round"/>
+    </svg>`,
+
+    // 8: Overlord (Void Cosmic Portal Gate)
+    `<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="50" cy="50" r="40" fill="#3b0764" stroke="#a855f7" stroke-width="4"/>
+      <circle cx="50" cy="50" r="28" fill="#581c87" stroke="#e879f9" stroke-width="3" stroke-dasharray="6 4"/>
+      <polygon points="50,18 60,40 82,50 60,60 50,82 40,60 18,50 40,40" fill="#c084fc" stroke="#fff" stroke-width="2"/>
+      <circle cx="50" cy="50" r="8" fill="#38bdf8"/>
+    </svg>`,
+
+    // 9: Grandmaster (Imperial Sovereign Gold Crown with Diamond Starburst)
+    `<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 75 L20 30 L40 50 L50 15 L60 50 L80 30 L88 75 Z" fill="#713f12" stroke="#eab308" stroke-width="4"/>
+      <path d="M12 75 L88 75 L82 88 L18 88 Z" fill="#a16207" stroke="#fde047" stroke-width="3"/>
+      <polygon points="50,2 58,22 80,22 62,34 68,54 50,42 32,54 38,34 20,22 42,22" fill="#fde047" stroke="#fff" stroke-width="2"/>
+      <circle cx="50" cy="70" r="7" fill="#ef4444" stroke="#fff" stroke-width="2"/>
+      <circle cx="30" cy="70" r="5" fill="#3b82f6" stroke="#fff" stroke-width="1.5"/>
+      <circle cx="70" cy="70" r="5" fill="#22c55e" stroke="#fff" stroke-width="1.5"/>
+    </svg>`
+  ];
+
+  /* Wild, vibrant rank color themes & aura configurations */
+  const RANK_THEMES = [
+    { // Bronze Recruiter
+      border: "#d97706",
+      badge: "#f59e0b",
+      soundType: "bronze",
+      glow: "rgba(245, 158, 11, 0.45)",
+      auraColor1: "#f59e0b",
+      auraColor2: "#d97706",
+      bg: "linear-gradient(135deg, rgba(217, 119, 6, 0.2), rgba(180, 83, 9, 0.05))",
+      levelBar: "linear-gradient(90deg, #b45309, #f59e0b)",
+      rankBar: "linear-gradient(90deg, #d97706, #fbbf24)"
+    },
+    { // Apprentice
+      border: "#10b981",
+      badge: "#34d399",
+      soundType: "apprentice",
+      glow: "rgba(52, 211, 153, 0.5)",
+      auraColor1: "#34d399",
+      auraColor2: "#10b981",
+      bg: "linear-gradient(135deg, rgba(16, 185, 129, 0.22), rgba(5, 150, 105, 0.05))",
+      levelBar: "linear-gradient(90deg, #059669, #34d399)",
+      rankBar: "linear-gradient(90deg, #10b981, #6ee7b7)"
+    },
+    { // Iron Core
+      border: "#64748b",
+      badge: "#cbd5e1",
+      soundType: "iron",
+      glow: "rgba(203, 213, 225, 0.45)",
+      auraColor1: "#cbd5e1",
+      auraColor2: "#64748b",
+      bg: "linear-gradient(135deg, rgba(100, 116, 139, 0.3), rgba(51, 65, 85, 0.1))",
+      levelBar: "linear-gradient(90deg, #475569, #94a3b8)",
+      rankBar: "linear-gradient(90deg, #64748b, #e2e8f0)"
+    },
+    { // Steel Breaker
+      border: "#06b6d4",
+      badge: "#22d3ee",
+      soundType: "steel",
+      glow: "rgba(34, 211, 238, 0.55)",
+      auraColor1: "#22d3ee",
+      auraColor2: "#06b6d4",
+      bg: "linear-gradient(135deg, rgba(6, 182, 212, 0.25), rgba(8, 145, 178, 0.05))",
+      levelBar: "linear-gradient(90deg, #0891b2, #22d3ee)",
+      rankBar: "linear-gradient(90deg, #06b6d4, #67e8f9)"
+    },
+    { // Vanguard
+      border: "#8b5cf6",
+      badge: "#a78bfa",
+      soundType: "vanguard",
+      glow: "rgba(167, 139, 250, 0.55)",
+      auraColor1: "#a78bfa",
+      auraColor2: "#8b5cf6",
+      bg: "linear-gradient(135deg, rgba(139, 92, 246, 0.25), rgba(109, 40, 217, 0.08))",
+      levelBar: "linear-gradient(90deg, #6d28d9, #a78bfa)",
+      rankBar: "linear-gradient(90deg, #8b5cf6, #c4b5fd)"
+    },
+    { // Titan Juggernaut
+      border: "#f97316",
+      badge: "#fb923c",
+      soundType: "titan",
+      glow: "rgba(251, 146, 60, 0.6)",
+      auraColor1: "#fb923c",
+      auraColor2: "#f97316",
+      bg: "linear-gradient(135deg, rgba(249, 115, 22, 0.28), rgba(194, 65, 12, 0.08))",
+      levelBar: "linear-gradient(90deg, #c2410c, #fb923c)",
+      rankBar: "linear-gradient(90deg, #f97316, #fdba74)"
+    },
+    { // Shadow Striker
+      border: "#ec4899",
+      badge: "#f472b6",
+      soundType: "shadow",
+      glow: "rgba(244, 114, 182, 0.6)",
+      auraColor1: "#f472b6",
+      auraColor2: "#ec4899",
+      bg: "linear-gradient(135deg, rgba(236, 72, 153, 0.28), rgba(190, 24, 93, 0.08))",
+      levelBar: "linear-gradient(90deg, #be185d, #f472b6)",
+      rankBar: "linear-gradient(90deg, #ec4899, #fbcfe8)"
+    },
+    { // Warlord
+      border: "#ef4444",
+      badge: "#f87171",
+      soundType: "warlord",
+      glow: "rgba(248, 113, 113, 0.65)",
+      auraColor1: "#f87171",
+      auraColor2: "#ef4444",
+      bg: "linear-gradient(135deg, rgba(239, 68, 68, 0.3), rgba(185, 28, 28, 0.1))",
+      levelBar: "linear-gradient(90deg, #b91c1c, #f87171)",
+      rankBar: "linear-gradient(90deg, #ef4444, #fca5a5)"
+    },
+    { // Overlord
+      border: "#a855f7",
+      badge: "#e879f9",
+      soundType: "overlord",
+      glow: "rgba(232, 121, 249, 0.7)",
+      auraColor1: "#e879f9",
+      auraColor2: "#a855f7",
+      bg: "linear-gradient(135deg, rgba(168, 85, 247, 0.3), rgba(126, 34, 206, 0.1))",
+      levelBar: "linear-gradient(90deg, #7e22ce, #e879f9)",
+      rankBar: "linear-gradient(90deg, #a855f7, #f0abfc)"
+    },
+    { // Grandmaster
+      border: "#eab308",
+      badge: "#fde047",
+      soundType: "grandmaster",
+      glow: "rgba(253, 224, 71, 0.8)",
+      auraColor1: "#fde047",
+      auraColor2: "#eab308",
+      bg: "linear-gradient(135deg, rgba(234, 179, 8, 0.35), rgba(161, 98, 7, 0.12))",
+      levelBar: "linear-gradient(90deg, #a16207, #fde047)",
+      rankBar: "linear-gradient(90deg, #eab308, #fef08a)"
+    }
+  ];
+
+  function triggerRankUpgradeAnimation(rankIndex) {
+    const overlay = document.getElementById('rank-upgrade-overlay');
+    const title = document.getElementById('rankUpTitle');
+    const card = document.getElementById('rankUpCard');
+    const iconBox = document.getElementById('rankUpIconBox');
+
+    const rankTitle = RANKS[rankIndex];
+    const rankTheme = RANK_THEMES[rankIndex];
+    const svgCode = SVG_ICONS[rankIndex];
+    
+    if (title) {
+      title.innerText = rankTitle;
+      title.style.color = rankTheme.badge;
+    }
+    if (iconBox) {
+      iconBox.innerHTML = svgCode;
+    }
+    if (card) {
+      card.style.borderColor = rankTheme.border;
+      card.style.boxShadow = `0 0 80px ${rankTheme.glow}`;
+    }
+
+    const root = document.documentElement;
+    root.style.setProperty('--rank-aura-color1', rankTheme.auraColor1);
+    root.style.setProperty('--rank-aura-color2', rankTheme.auraColor2);
+
+    if (overlay) {
+      overlay.classList.add('active');
+    }
+    
+    playRankSound(rankTheme.soundType);
+  }
+
+  function closeRankUpgrade() {
+    const overlay = document.getElementById('rank-upgrade-overlay');
+    if (overlay) overlay.classList.remove('active');
+  }
+
+  function getMonthKey(date = new Date()) {
+    return `${date.getFullYear()}-${date.getMonth()}`;
+  }
+
+  function getTodayKey(date = new Date()) {
+    return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+  }
+
+  const REPS_PER_LEVEL = 100;
+  const REPS_PER_RANK = 3000;
+
+  let state = {
+    monthReps: 0,
+    lifetimeReps: 0,
+    sets: [],
+    monthlyData: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    reminders: [],
+    lastSavedMonth: getMonthKey(),
+    lastSavedDay: getTodayKey()
+  };
+
+  let chart = null;
+
+  function loadData() {
+    try {
+      const saved = localStorage.getItem('pushup_tracker_state');
+      if (saved) {
+        const parsedState = JSON.parse(saved);
+        const currentMonthKey = getMonthKey();
+        const currentDayKey = getTodayKey();
+
+        if (parsedState.lastSavedMonth !== currentMonthKey) {
+          parsedState.monthReps = 0;
+          parsedState.lastSavedMonth = currentMonthKey;
+        }
+
+        if (parsedState.lastSavedDay !== currentDayKey) {
+          parsedState.sets = [];
+          parsedState.lastSavedDay = currentDayKey;
+        }
+
+        state = Object.assign({}, state, parsedState);
+      }
+    } catch (e) {
+      console.error("Error loading saved data:", e);
+    }
+  }
+
+  function saveData() {
+    try {
+      state.lastSavedMonth = getMonthKey();
+      state.lastSavedDay = getTodayKey();
+      localStorage.setItem('pushup_tracker_state', JSON.stringify(state));
+    } catch (e) {
+      console.error("Error saving data:", e);
+    }
+  }
+
+  function getTodayReps() {
+    if (!state.sets || state.sets.length === 0) return 0;
+    return state.sets.reduce((sum, s) => sum + s, 0);
+  }
+
+  function isDailyGoalReached() {
+    return getTodayReps() >= 100;
+  }
+
+  function addReps(count) {
+    if (count === 0 || isNaN(count)) return;
+
+    // Lock logging once daily goal of 100 is reached (still allow negative corrections)
+    if (count > 0 && isDailyGoalReached()) return;
+
+    const prevLevel = Math.floor(state.lifetimeReps / REPS_PER_LEVEL) + 1;
+    const prevRankIndex = Math.min(Math.floor(state.lifetimeReps / REPS_PER_RANK), RANKS.length - 1);
+
+    state.monthReps = Math.max(0, state.monthReps + count);
+    state.lifetimeReps = Math.max(0, state.lifetimeReps + count);
+    state.sets.push(count);
+
+    const monthIndex = new Date().getMonth();
+    state.monthlyData[monthIndex] = state.monthReps;
+
+    const newLevel = Math.floor(state.lifetimeReps / REPS_PER_LEVEL) + 1;
+    const newRankIndex = Math.min(Math.floor(state.lifetimeReps / REPS_PER_RANK), RANKS.length - 1);
+
+    if (newRankIndex > prevRankIndex) {
+      triggerRankUpgradeAnimation(newRankIndex);
+    } else if (newLevel > prevLevel) {
+      playLevelUpSound();
+    } else {
+      playSetLogSound();
+    }
+
+    saveData();
+    updateUI();
+  }
+
+  function addCustom() {
+    const input = document.getElementById('customInput');
+    if (!input) return;
+    const val = parseInt(input.value, 10);
+    if (!isNaN(val) && val !== 0) {
+      addReps(val);
+      input.value = '';
+    }
+  }
+
+  /* Reminder Logic */
+  function requestNotificationPermission() {
+    if ('Notification' in window) {
+      Notification.requestPermission().then(permission => {
+        updateNotificationBtn();
+        if (permission === 'granted') {
+          alert("Notifications enabled! You'll be alerted when it's time for your workout.");
+        }
+      });
+    } else {
+      alert("Notifications are not supported on this browser.");
+    }
+  }
+
+  function updateNotificationBtn() {
+    const btn = document.getElementById('notifPermBtn');
+    if (!btn || !('Notification' in window)) return;
+    if (Notification.permission === 'granted') {
+      btn.innerText = 'Notifications Active';
+      btn.style.background = 'rgba(34, 197, 94, 0.2)';
+      btn.style.color = 'var(--success)';
+      btn.style.borderColor = 'var(--success)';
+    } else if (Notification.permission === 'denied') {
+      btn.innerText = 'Notifications Blocked';
+      btn.style.background = 'rgba(239, 68, 68, 0.2)';
+      btn.style.color = 'var(--danger)';
+    }
+  }
+
+  function addReminder() {
+    const timeInput = document.getElementById('reminderTimeInput');
+    if (!timeInput || !timeInput.value) return;
+
+    const timeVal = timeInput.value;
+    if (!state.reminders) state.reminders = [];
+    
+    if (state.reminders.some(r => r.time === timeVal)) {
+      alert('A reminder for this time already exists.');
+      return;
+    }
+
+    state.reminders.push({ time: timeVal, enabled: true });
+    saveData();
+    updateUI();
+    timeInput.value = '';
+
+    if ('Notification' in window && Notification.permission === 'default') {
+      requestNotificationPermission();
+    }
+  }
+
+  function toggleReminder(index) {
+    if (state.reminders && state.reminders[index]) {
+      state.reminders[index].enabled = !state.reminders[index].enabled;
+      saveData();
+      updateUI();
+    }
+  }
+
+  function deleteReminder(index) {
+    if (state.reminders) {
+      state.reminders.splice(index, 1);
+      saveData();
+      updateUI();
+    }
+  }
+
+  let triggeredReminders = {};
+
+  function checkReminders() {
+    if (!state.reminders || state.reminders.length === 0) return;
+
+    const now = new Date();
+    const currentHours = String(now.getHours()).padStart(2, '0');
+    const currentMinutes = String(now.getMinutes()).padStart(2, '0');
+    const currentTimeStr = `${currentHours}:${currentMinutes}`;
+
+    state.reminders.forEach((r) => {
+      if (r.enabled && r.time === currentTimeStr) {
+        if (!triggeredReminders[r.time]) {
+          triggeredReminders[r.time] = true;
+          triggerWorkoutNotification(r.time);
+        }
+      } else {
+        triggeredReminders[r.time] = false;
+      }
+    });
+  }
+
+  function triggerWorkoutNotification(timeStr) {
+    playLevelUpSound();
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification("⚡ Workout Time!", {
+        body: `It's ${timeStr}! Time to crush your push-up goal!`,
+        icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%230f172a"/><path d="M80 60L87 54L80 48L62 66L20 24L38 6L30 0L24 6L18 0L12 6L0 18L6 24L0 30L6 36L24 18L66 62L48 80L54 87L60 80L66 87L72 80L87 65L80 60Z" fill="%2338bdf8"/></svg>'
+      });
+    } else {
+      alert(`⚡ Workout Time! (${timeStr})\nTime to get those push-ups in!`);
+    }
+  }
+
+  /* Reset Functions */
+  function showResetModal() {
+    const modal = document.getElementById('resetModal');
+    if (modal) modal.classList.add('active');
+  }
+
+  function hideResetModal() {
+    const modal = document.getElementById('resetModal');
+    if (modal) modal.classList.remove('active');
+  }
+
+  function confirmReset() {
+    localStorage.removeItem('pushup_tracker_state');
+    state = {
+      monthReps: 0,
+      lifetimeReps: 0,
+      sets: [],
+      monthlyData: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      reminders: [],
+      lastSavedMonth: getMonthKey(),
+      lastSavedDay: getTodayKey()
+    };
+    saveData();
+    updateUI();
+    hideResetModal();
+  }
+
+  window.dismissSplash = dismissSplash;
+  window.addReps = addReps;
+  window.addCustom = addCustom;
+  window.showResetModal = showResetModal;
+  window.hideResetModal = hideResetModal;
+  window.confirmReset = confirmReset;
+  window.requestNotificationPermission = requestNotificationPermission;
+  window.addReminder = addReminder;
+  window.toggleReminder = toggleReminder;
+  window.deleteReminder = deleteReminder;
+  window.closeRankUpgrade = closeRankUpgrade;
+
+  function applyRankTheme(rankIndex) {
+    const theme = RANK_THEMES[rankIndex] || RANK_THEMES[0];
+    const root = document.documentElement;
+
+    root.style.setProperty('--rank-border', theme.border);
+    root.style.setProperty('--rank-badge-color', theme.badge);
+    root.style.setProperty('--rank-glow', theme.glow);
+    root.style.setProperty('--rank-bg-gradient', theme.bg);
+    root.style.setProperty('--rank-lbl-color', theme.badge);
+
+    const levelBarElem = document.getElementById('levelBar');
+    if (levelBarElem) levelBarElem.style.background = theme.levelBar;
+
+    const rankBarElem = document.getElementById('rankBar');
+    if (rankBarElem) rankBarElem.style.background = theme.rankBar;
+  }
+
+  function updateUI() {
+    const totalLifetime = state.lifetimeReps;
+    const currentLevel = Math.floor(totalLifetime / REPS_PER_LEVEL) + 1;
+    const repsInCurrentLevel = totalLifetime % REPS_PER_LEVEL;
+    const levelPct = (repsInCurrentLevel / REPS_PER_LEVEL) * 100;
+
+    const rawRankIndex = Math.floor(totalLifetime / REPS_PER_RANK);
+    const rankIndex = Math.min(rawRankIndex, RANKS.length - 1);
+    const nextRankIndex = Math.min(rankIndex + 1, RANKS.length - 1);
+    
+    const isMaxRank = rankIndex === RANKS.length - 1;
+    const repsInCurrentRank = isMaxRank ? REPS_PER_RANK : (totalLifetime % REPS_PER_RANK);
+    const rankPct = isMaxRank ? 100 : (repsInCurrentRank / REPS_PER_RANK) * 100;
+
+    const currentRankTitle = RANKS[rankIndex];
+    const currentRankSvg = SVG_ICONS[rankIndex];
+    const nextRankTitle = RANKS[nextRankIndex];
+
+    applyRankTheme(rankIndex);
+
+    const headerIconElem = document.getElementById('headerRankIcon');
+    if (headerIconElem) headerIconElem.innerHTML = currentRankSvg;
+
+    const rankTitleElem = document.getElementById('rankTitle');
+    if (rankTitleElem) rankTitleElem.innerText = `Lvl ${currentLevel} • ${currentRankTitle}`;
+
+    const levelBarElem = document.getElementById('levelBar');
+    if (levelBarElem) levelBarElem.style.width = `${levelPct}%`;
+
+    const currentLevelDaysElem = document.getElementById('currentLevelDays');
+    if (currentLevelDaysElem) currentLevelDaysElem.innerText = `${repsInCurrentLevel} / 100 Reps`;
+
+    const nextLevelElem = document.getElementById('nextLevel');
+    if (nextLevelElem) nextLevelElem.innerText = `Level ${currentLevel + 1} in ${REPS_PER_LEVEL - repsInCurrentLevel} Reps`;
+
+    const rankBarElem = document.getElementById('rankBar');
+    if (rankBarElem) rankBarElem.style.width = `${rankPct}%`;
+
+    const currentRankMonthsElem = document.getElementById('currentRankMonths');
+    if (currentRankMonthsElem) {
+      currentRankMonthsElem.innerText = isMaxRank ? `3,000 / 3,000 Reps` : `${repsInCurrentRank.toLocaleString()} / 3,000 Reps`;
+    }
+
+    const nextRankTitleElem = document.getElementById('nextRankTitle');
+    if (nextRankTitleElem) {
+      nextRankTitleElem.innerText = isMaxRank ? 'MAX RANK ACHIEVED' : `Next Rank: ${nextRankTitle}`;
+    }
+
+    const monthCountElem = document.getElementById('monthCount');
+    if (monthCountElem) monthCountElem.innerText = state.monthReps.toLocaleString();
+
+    const activeDaysCountElem = document.getElementById('activeDaysCount');
+    if (activeDaysCountElem) activeDaysCountElem.innerText = `Lvl ${currentLevel}`;
+
+    const totalLifetimeElem = document.getElementById('totalLifetime');
+    if (totalLifetimeElem) totalLifetimeElem.innerText = state.lifetimeReps.toLocaleString();
+
+    const todayReps = getTodayReps();
+    const todayPct = Math.min((todayReps / 100) * 100, 100);
+    const todayBar = document.getElementById('todayBar');
+    if (todayBar) todayBar.style.width = todayPct + '%';
+    const todayGoalText = document.getElementById('todayGoalText');
+    if (todayGoalText) todayGoalText.innerText = `${Math.max(0, todayReps)} / 100`;
+    const todayRepsBadge = document.getElementById('todayRepsBadge');
+    if (todayRepsBadge) todayRepsBadge.innerText = `${Math.max(0, todayReps)} today`;
+
+    const monthlyPct = Math.min((state.monthReps / 3000) * 100, 100);
+    const monthlyBarElem = document.getElementById('monthlyBar');
+    if (monthlyBarElem) monthlyBarElem.style.width = monthlyPct + '%';
+    const monthGoalText = document.getElementById('monthGoalText');
+    if (monthGoalText) monthGoalText.innerText = `${state.monthReps.toLocaleString()} / 3,000`;
+
+    const historyElem = document.getElementById('setHistory');
+    const emptySets = document.getElementById('emptySets');
+    if (historyElem) {
+      if (!state.sets || state.sets.length === 0) {
+        historyElem.innerHTML = '';
+        if (emptySets) emptySets.style.display = 'block';
+      } else {
+        if (emptySets) emptySets.style.display = 'none';
+        historyElem.innerHTML = state.sets.map(s => {
+          const isNeg = s < 0;
+          return `<span class="set-chip ${isNeg ? 'negative' : ''}">${s > 0 ? '+' : ''}${s}</span>`;
+        }).join('');
+      }
+    }
+
+    /* Daily goal lock (100 reps) */
+    const goalReached = isDailyGoalReached();
+    const presetButtons = document.getElementById('presetButtons');
+    const customLogGroup = document.getElementById('customLogGroup');
+    const dailyGoalLocked = document.getElementById('dailyGoalLocked');
+    const logLabel = document.getElementById('logLabel');
+    const customInput = document.getElementById('customInput');
+    const logSetBtn = document.getElementById('logSetBtn');
+
+    if (presetButtons) presetButtons.style.display = goalReached ? 'none' : 'grid';
+    if (customLogGroup) customLogGroup.style.display = goalReached ? 'none' : 'flex';
+    if (dailyGoalLocked) dailyGoalLocked.style.display = goalReached ? 'block' : 'none';
+    if (logLabel) logLabel.innerText = goalReached ? 'Daily Goal Status:' : 'Log Completed Set:';
+    if (customInput) customInput.disabled = goalReached;
+    if (logSetBtn) logSetBtn.disabled = goalReached;
+
+    /* Update Reminders List */
+    const reminderListElem = document.getElementById('reminderList');
+    if (reminderListElem) {
+      if (!state.reminders || state.reminders.length === 0) {
+        reminderListElem.innerHTML = '<div style="font-size:0.85rem; color: var(--text-muted); text-align:center;">No reminders set.</div>';
+      } else {
+        reminderListElem.innerHTML = state.reminders.map((r, idx) => `
+          <div class="reminder-item">
+            <span style="font-weight: bold; font-size: 1.1rem;">${r.time}</span>
+            <div class="reminder-controls">
+              <label class="switch">
+                <input type="checkbox" ${r.enabled ? 'checked' : ''} onchange="toggleReminder(${idx})">
+                <span class="slider"></span>
+              </label>
+              <button class="btn-danger" style="padding: 4px 8px; font-size: 0.8rem;" onclick="deleteReminder(${idx})">✕</button>
+            </div>
+          </div>
+        `).join('');
+      }
+    }
+
+    updateNotificationBtn();
+
+    if (chart) {
+      chart.data.datasets[0].data = state.monthlyData;
+      chart.update();
+    }
+  }
+
+  function setupChart() {
+    const canvas = document.getElementById('monthlyChart');
+    if (!canvas || typeof Chart === 'undefined') return;
+
+    const ctx = canvas.getContext('2d');
+    chart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+        datasets: [{
+          label: 'Push-ups Logged',
+          data: state.monthlyData,
+          backgroundColor: '#a855f7',
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { color: '#94a3b8' },
+            grid: { color: '#334155' }
+          },
+          x: {
+            ticks: { color: '#94a3b8' },
+            grid: { display: false }
+          }
+        }
+      }
+    });
+  }
+
+  /* ===== Animated Purple Flame Particle System ===== */
+  function initFlameAura() {
+    const canvas = document.getElementById('flameCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+    let w, h, animId;
+
+    function resize() {
+      w = canvas.width = window.innerWidth;
+      h = canvas.height = Math.min(window.innerHeight * 0.45, 460);
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    function spawn() {
+      const count = 3 + Math.floor(Math.random() * 3);
+      for (let i = 0; i < count; i++) {
+        const x = w * 0.15 + Math.random() * w * 0.7;
+        particles.push({
+          x,
+          y: h + 10 + Math.random() * 30,
+          vx: (Math.random() - 0.5) * 1.4,
+          vy: -1.2 - Math.random() * 2.8,
+          life: 1,
+          decay: 0.004 + Math.random() * 0.008,
+          size: 18 + Math.random() * 42,
+          wobble: Math.random() * Math.PI * 2,
+          wobbleSpeed: 0.02 + Math.random() * 0.04,
+          hue: 270 + Math.random() * 30, // purple range
+          bright: 0.45 + Math.random() * 0.55
+        });
+      }
+    }
+
+    function frame() {
+      ctx.clearRect(0, 0, w, h);
+
+      // soft base glow
+      const baseGrad = ctx.createLinearGradient(0, h - 40, 0, h);
+      baseGrad.addColorStop(0, 'rgba(124, 58, 237, 0)');
+      baseGrad.addColorStop(1, 'rgba(124, 58, 237, 0.18)');
+      ctx.fillStyle = baseGrad;
+      ctx.fillRect(0, h - 50, w, 50);
+
+      if (particles.length < 90) spawn();
+
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.wobble += p.wobbleSpeed;
+        p.x += p.vx + Math.sin(p.wobble) * 0.9;
+        p.y += p.vy;
+        p.life -= p.decay;
+        p.size *= 0.995;
+
+        if (p.life <= 0 || p.y < -50) {
+          particles.splice(i, 1);
+          continue;
+        }
+
+        const alpha = p.life * p.bright;
+        const r = p.size;
+
+        // outer soft glow
+        const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+        g.addColorStop(0, `hsla(${p.hue}, 95%, 75%, ${alpha * 0.7})`);
+        g.addColorStop(0.35, `hsla(${p.hue}, 90%, 55%, ${alpha * 0.35})`);
+        g.addColorStop(0.7, `hsla(${p.hue - 10}, 85%, 40%, ${alpha * 0.12})`);
+        g.addColorStop(1, `hsla(${p.hue}, 80%, 30%, 0)`);
+
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+        ctx.fillStyle = g;
+        ctx.fill();
+      }
+
+      ctx.globalCompositeOperation = 'source-over';
+      animId = requestAnimationFrame(frame);
+    }
+
+    frame();
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    loadData();
+    setupChart();
+    updateUI();
+    splashTimer = setTimeout(dismissSplash, 2500);
+    initFlameAura();
+
+    const customInput = document.getElementById('customInput');
+    if (customInput) {
+      customInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          addCustom();
+        }
+      });
+    }
+
+    // Check reminders every 10 seconds
+    setInterval(checkReminders, 10000);
+    checkReminders();
+  });
+</script>
+</body>
+</html>
